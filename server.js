@@ -26,7 +26,10 @@ app.use('/api/shopify', shopifyRoutes);
 app.use('/api/shopify-order', shopifyOrderRoutes);
 app.use('/api/shopify-discount', shopifyDiscountRoutes);
 app.use('/api/shopify-customer', shopifyCustomerRoutes);
-app.use('/api/get-products', getProductsRoutes);
+app.use('/api/get', getProductsRoutes);
+
+
+
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
