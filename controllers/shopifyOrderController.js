@@ -117,7 +117,7 @@ exports.syncShopifyOrders = async (req, res) => {
   }
 };
 
-// 🔹 Helper function (same as Laravel protected method)
+
 const getProductIdAndImage = async (variantId) => {
   const variant = await ProductVariant.findOne({ shopify_variant_id: variantId });
 
