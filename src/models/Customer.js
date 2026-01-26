@@ -1,6 +1,7 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const customerSchema = new mongoose.Schema({
+const customerSchema = new mongoose.Schema(
+  {
     shopify_customer_id: { type: Number, unique: true },
     first_name: String,
     last_name: String,
@@ -11,6 +12,8 @@ const customerSchema = new mongoose.Schema({
     province: String,
     zip: String,
     country: String,
-}, { timestamps: true });
+  },
+  { timestamps: true },
+);
 
-module.exports = mongoose.model('Customer', customerSchema);
+module.exports = mongoose.model("Customer", customerSchema);
