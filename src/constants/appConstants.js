@@ -18,6 +18,7 @@ const API_MESSAGES = {
   NOT_FOUND: "Resource not found",
   UNAUTHORIZED: "Unauthorized access",
   INVALID_API_KEY: "Invalid API key",
+  API_KEY_MISSING: "API key missing"
 };
 
 // Database Constants

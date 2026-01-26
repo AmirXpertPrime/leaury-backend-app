@@ -1,5 +1,5 @@
-const NewArrivalTag = require('../models/NewArrivalTag');
-const { COLLECTION_TAGS } = require('../constants');
+const NewArrivalTag = require("../models/NewArrivalTag");
+const { COLLECTION_TAGS } = require("../constants");
 
 async function seedNewArrivalTags() {
   const existingCount = await NewArrivalTag.countDocuments();
@@ -10,5 +10,3 @@ async function seedNewArrivalTags() {
 }
 
 module.exports = seedNewArrivalTags;
-
-
