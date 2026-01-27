@@ -9,7 +9,9 @@ const { getPagination } = require("../utils/helper");
 exports.getShopifyCustomerOrders = async (req, res) => {
   try {
     const { customerId, shopifyCustomerId } = req.query;
-    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
+    const { page, limit, skip } = getPagination(req.query, {
+      defaultLimit: 10,
+    });
 
     let shopifyId = null;
 
@@ -57,7 +59,9 @@ exports.getShopifyCustomerOrders = async (req, res) => {
 
     // Fetch line items for all orders in this page
     const orderIds = orders.map((order) => order._id);
-    const lineItems = await OrderLineItem.find({ order_id: { $in: orderIds } }).lean();
+    const lineItems = await OrderLineItem.find({
+      order_id: { $in: orderIds },
+    }).lean();
 
     // Group line items by order_id
     const lineItemsByOrderId = {};
@@ -102,7 +106,9 @@ exports.getShopifyCustomerOrders = async (req, res) => {
 exports.getShopifyCustomerOrdersFromAPI = async (req, res) => {
   try {
     const { customerId, shopifyCustomerId } = req.query;
-    const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
+    const { page, limit, skip } = getPagination(req.query, {
+      defaultLimit: 10,
+    });
 
     let user = null;
     if (customerId && mongoose.Types.ObjectId.isValid(customerId)) {
