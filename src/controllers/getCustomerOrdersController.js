@@ -1,6 +1,8 @@
 const axios = require("axios");
 const mongoose = require("mongoose");
 const Customer = require("../models/Customer");
+const Order = require("../models/Order");
+const OrderLineItem = require("../models/OrderLineItem");
 const { getPagination } = require("../utils/helper");
 
 exports.getShopifyCustomerOrders = async (req, res) => {
@@ -31,22 +33,44 @@ exports.getShopifyCustomerOrders = async (req, res) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    const response = await axios.get(
-      `${process.env.SHOPIFY_API_URL}/customers/${user.shopify_customer_id}/orders.json?status=any&limit=250`,
-      {
-        headers: {
-          "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
-        },
-      },
-    );
+    // Get total count of orders for this customer
+    const totalOrders = await Order.countDocuments({
+      shopify_customer_id: user.shopify_customer_id,
+    });
 
-    const allOrders = response.data.orders || [];
-    const totalOrders = allOrders.length;
-    const paginatedOrders = allOrders.slice(skip, skip + limit);
+    // Fetch paginated orders from database
+    const orders = await Order.find({
+      shopify_customer_id: user.shopify_customer_id,
+    })
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Fetch line items for all orders in this page
+    const orderIds = orders.map((order) => order._id);
+    const lineItems = await OrderLineItem.find({ order_id: { $in: orderIds } })
+      .lean();
+
+    // Group line items by order_id
+    const lineItemsByOrderId = {};
+    lineItems.forEach((item) => {
+      const orderId = item.order_id.toString();
+      if (!lineItemsByOrderId[orderId]) {
+        lineItemsByOrderId[orderId] = [];
+      }
+      lineItemsByOrderId[orderId].push(item);
+    });
+
+    // Attach line items to each order
+    const ordersWithLineItems = orders.map((order) => ({
+      ...order,
+      line_items: lineItemsByOrderId[order._id.toString()] || [],
+    }));
 
     return res.status(200).json({
       status: 200,
-      orders: paginatedOrders,
+      data: ordersWithLineItems,
       pagination: {
         page,
         limit,
