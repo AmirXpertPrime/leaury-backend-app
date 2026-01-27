@@ -4,8 +4,9 @@ const {
   getShopifyCustomerOrders,
   getShopifyCustomerOrdersFromAPI,
 } = require("../controllers/getCustomerOrdersController");
+const authMiddleware = require("../middlewares/apiKeyAuth");
 
-router.get("/customer", getShopifyCustomerOrders);
+router.get("/customer", authMiddleware, getShopifyCustomerOrders);
 router.get("/customer/shopify-api", getShopifyCustomerOrdersFromAPI);
 
 module.exports = router;

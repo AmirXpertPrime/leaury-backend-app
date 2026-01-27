@@ -1,11 +1,9 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
+const authMiddleware = require("../middlewares/apiKeyAuth");
+const {
+  getCategoriesApi,
+} = require("../controllers/getCategoriesApiController");
 
-const { getCategoriesApi } = require('../controllers/getCategoriesApiController');
-
-// Standalone endpoint (not part of products router)
-router.get('/', getCategoriesApi);
-
+router.get("/", authMiddleware, getCategoriesApi);
 module.exports = router;
-
-
