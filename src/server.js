@@ -13,6 +13,7 @@ const getProductsRoutes = require("./routes/getProductsRoutes");
 const getSingleProductRoutes = require("./routes/getSingleProductRoutes");
 const getNewArrivalTagsRoutes = require("./routes/getNewArrivalTags");
 const getCustomerOrdersRoutes = require("./routes/getCustomerOrdersRoutes");
+const deleteCustomerProfileRoutes = require("./routes/deleteCustomerProfile");
 dotenv.config();
 
 const app = express();
@@ -42,6 +43,7 @@ app.use("/api/single", getSingleProductRoutes);
 app.use("/api/new-arrival", getNewArrivalTagsRoutes);
 
 app.use("/api/order", getCustomerOrdersRoutes);
+app.use("/api/customer", deleteCustomerProfileRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

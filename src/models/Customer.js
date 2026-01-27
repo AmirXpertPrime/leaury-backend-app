@@ -12,6 +12,7 @@ const customerSchema = new mongoose.Schema(
     province: String,
     zip: String,
     country: String,
+    isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
