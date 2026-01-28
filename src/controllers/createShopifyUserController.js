@@ -1,15 +1,10 @@
 const axios = require("axios");
-const {
-  emailRequired,
-  phoneRequired,
-  validateEmail,
-} = require("../utils/helper");
+const { validateEmail, validatePhone, validateRequired } = require("../utils/validators");
 const Customer = require("../models/Customer");
 const { ERROR, SUCCESS } = require("../constants/appStrings");
 
-const handleShopifyError = (error, res) => {
+const handleShopifyError = (error) => {
   const shopifyErrors = error.response?.data?.errors;
-  console.error("Shopify Error:", shopifyErrors || error.message);
 
   let friendlyMessage = ERROR.FAILED_TO_PROCESS;
   let statusCode = error.response?.status || 500;
@@ -24,17 +19,17 @@ const handleShopifyError = (error, res) => {
     friendlyMessage = ERROR.INVALID_PHONE;
   }
 
-  return res
-    .status(statusCode)
-    .json({ status: statusCode, message: friendlyMessage });
+  const error_obj = new Error(friendlyMessage);
+  error_obj.status = statusCode;
+  throw error_obj;
 };
 
 const updateLocalCustomer = async (userId, shopifyCustomer) => {
   return await Customer.findByIdAndUpdate(userId, {
-    first_name: shopifyCustomer.first_name,
-    last_name: shopifyCustomer.last_name,
+    first_name: shopifyCustomer.first_name || null,
+    last_name: shopifyCustomer.last_name || null,
     email: shopifyCustomer.email,
-    phone: shopifyCustomer.phone,
+    phone: shopifyCustomer.phone || null,
     address1: shopifyCustomer.default_address?.address1 || null,
     city: shopifyCustomer.default_address?.city || null,
     province: shopifyCustomer.default_address?.province || null,
@@ -46,10 +41,10 @@ const updateLocalCustomer = async (userId, shopifyCustomer) => {
 const createLocalCustomer = async (shopifyCustomer) => {
   return await Customer.create({
     shopify_customer_id: shopifyCustomer.id,
-    first_name: shopifyCustomer.first_name,
-    last_name: shopifyCustomer.last_name,
+    first_name: shopifyCustomer.first_name || null,
+    last_name: shopifyCustomer.last_name || null,
     email: shopifyCustomer.email,
-    phone: shopifyCustomer.phone,
+    phone: shopifyCustomer.phone || null,
     address1: shopifyCustomer.default_address?.address1 || null,
     city: shopifyCustomer.default_address?.city || null,
     province: shopifyCustomer.default_address?.province || null,
@@ -58,34 +53,32 @@ const createLocalCustomer = async (shopifyCustomer) => {
   });
 };
 
-exports.createShopifyUser = async (req, res) => {
+exports.createShopifyUser = async (req, res, next) => {
   try {
     const payload = req.body.customer || req.body;
     const { first_name, last_name, email, phone } = payload;
-    const user = await Customer.findOne({ email });
-    if (user) {
-      console.log("User already exists:", user);
-      return await exports.updateShopifyUser(req, res, user);
+
+    // Validate required fields
+    const validatedEmail = validateEmail(email);
+    validatePhone(phone);
+
+    // Check if customer already exists
+    const existingUser = await Customer.findOne({ email: validatedEmail });
+    if (existingUser) {
+      req.user = existingUser;
+      return exports.updateShopifyUser(req, res, next);
     }
 
-    console.log("Incoming request:", req.body);
-
-    emailRequired(email, res);
-    phoneRequired(phone, res);
-    validateEmail(email, res);
-
     const customer = {
-      email,
-      ...(first_name && { first_name }),
-      ...(last_name && { last_name }),
-      ...(phone && { phone }),
+      email: validatedEmail,
+      ...(first_name && { first_name: validateRequired(first_name, "First name") }),
+      ...(last_name && { last_name: validateRequired(last_name, "Last name") }),
+      ...(phone && { phone: validatePhone(phone) }),
     };
-
-    const shopifyPayload = { customer };
 
     const response = await axios.post(
       `${process.env.SHOPIFY_API_URL}/customers.json`,
-      shopifyPayload,
+      { customer },
       {
         headers: {
           "X-Shopify-Access-Token": process.env.SHOPIFY_ACCESS_TOKEN,
@@ -94,26 +87,34 @@ exports.createShopifyUser = async (req, res) => {
       },
     );
 
-    console.log("Shopify Response:", response.data);
     const shopifyCustomer = response.data.customer;
     if (shopifyCustomer) {
-      console.log("Created Shopify Customer ID:", shopifyCustomer.id);
       await createLocalCustomer(shopifyCustomer);
     }
 
-    return res.status(201).json({
+    res.status(201).json({
+      success: true,
       status: 201,
       message: SUCCESS.USER_CREATED,
-      success: true,
-      //data: response.data,
     });
   } catch (error) {
-    return handleShopifyError(error, res);
+    // Handle Shopify API errors
+    if (error.response?.data?.errors) {
+      return next(handleShopifyError(error));
+    }
+    next(error);
   }
 };
 
-exports.updateShopifyUser = async (req, res, user) => {
+exports.updateShopifyUser = async (req, res, next) => {
   try {
+    const user = req.user;
+    if (!user) {
+      const error = new Error("User not found");
+      error.status = 404;
+      throw error;
+    }
+
     const payload = req.body.customer || req.body;
     const { first_name, last_name, email, phone } = payload;
 
@@ -121,20 +122,10 @@ exports.updateShopifyUser = async (req, res, user) => {
 
     const customer = {
       id: shopifyCustomerId,
-      ...(first_name && { first_name }),
-      ...(last_name && { last_name }),
-      ...(email && { email }),
-      ...(phone && { phone }),
-
-      // Example metafield update (same as your cURL)
-      metafields: [
-        {
-          key: "new",
-          value: "newvalue",
-          type: "single_line_text_field",
-          namespace: "global",
-        },
-      ],
+      ...(first_name && { first_name: validateRequired(first_name, "First name") }),
+      ...(last_name && { last_name: validateRequired(last_name, "Last name") }),
+      ...(email && { email: validateEmail(email) }),
+      ...(phone && { phone: validatePhone(phone) }),
     };
 
     const response = await axios.put(
@@ -148,19 +139,19 @@ exports.updateShopifyUser = async (req, res, user) => {
       },
     );
 
-    console.log("Shopify Update Response:", response.data);
-
     const updated = response.data.customer;
-
-    // Update mongoDB record
     await updateLocalCustomer(user._id, updated);
 
-    return res.status(200).json({
+    res.status(200).json({
+      success: true,
       status: 200,
       message: SUCCESS.CUSTOMER_UPDATED,
-      success: true,
     });
   } catch (error) {
-    return handleShopifyError(error, res);
+    // Handle Shopify API errors
+    if (error.response?.data?.errors) {
+      return next(handleShopifyError(error));
+    }
+    next(error);
   }
 };

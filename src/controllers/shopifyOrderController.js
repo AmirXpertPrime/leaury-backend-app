@@ -3,23 +3,17 @@ const Order = require('../models/Order');
 const OrderLineItem = require('../models/OrderLineItem');
 const ProductVariant = require('../models/ProductVariant');
 
-exports.syncShopifyOrders = async (req, res) => {
+exports.syncShopifyOrders = async (req, res, next) => {
   try {
     const startedAt = Date.now();
     const baseUrl = process.env.SHOPIFY_API_URL;
 
-    // Shopify REST API paginates results. If you don't pass `limit`, it defaults to 50.
-    // We'll fetch all pages using the `Link` header (rel="next"), like product sync.
     let nextUrl = `${baseUrl}/orders.json?status=any&limit=250`;
     let allOrders = [];
     let page = 0;
 
-    console.log('[syncShopifyOrders] Starting order sync...');
-    console.log('[syncShopifyOrders] First page URL:', nextUrl);
-
     while (nextUrl) {
       page += 1;
-      console.log(`[syncShopifyOrders] Fetching page ${page}...`);
       const response = await axios.get(nextUrl, {
         headers: {
           'X-Shopify-Access-Token': process.env.SHOPIFY_ACCESS_TOKEN,
@@ -28,35 +22,20 @@ exports.syncShopifyOrders = async (req, res) => {
       });
 
       const orders = response.data.orders || [];
-      console.log(`[syncShopifyOrders] Page ${page} fetched ${orders.length} orders`);
       allOrders.push(...orders);
 
       const linkHeader = response.headers.link;
       if (linkHeader) {
         const match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
         nextUrl = match ? match[1] : null;
-        console.log(`[syncShopifyOrders] Page ${page} next page:`, nextUrl ? 'YES' : 'NO');
       } else {
         nextUrl = null;
-        console.log(`[syncShopifyOrders] Page ${page} next page: NO (no Link header)`);
       }
     }
-
-    console.log('[syncShopifyOrders] Total orders fetched:', allOrders.length);
-    console.log('[syncShopifyOrders] Starting DB upserts...');
 
     const total = allOrders.length;
     for (let i = 0; i < total; i++) {
       const shopifyOrder = allOrders[i];
-      const shouldLogProgress = i === 0 || (i + 1) % 25 === 0 || i === total - 1;
-      if (shouldLogProgress) {
-        console.log(
-          `[syncShopifyOrders] Upserting order ${i + 1}/${total}`,
-          `id=${shopifyOrder.id}`,
-          `name=${shopifyOrder.name || 'n/a'}`,
-          `line_items=${shopifyOrder.line_items?.length ?? 0}`
-        );
-      }
 
       // 🔹 Order upsert
       const order = await Order.findOneAndUpdate(
@@ -102,18 +81,20 @@ exports.syncShopifyOrders = async (req, res) => {
     }
 
     const durationMs = Date.now() - startedAt;
-    console.log('[syncShopifyOrders] Done. Duration (ms):', durationMs);
 
     res.json({
+      success: true,
+      status: 200,
       message: 'Orders synced successfully',
-      totalOrders: allOrders.length,
-      durationMs,
-      pagesFetched: page,
+      data: {
+        totalOrders: allOrders.length,
+        pagesFetched: page,
+        durationMs,
+      }
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
@@ -122,11 +103,8 @@ const getProductIdAndImage = async (variantId) => {
   const variant = await ProductVariant.findOne({ shopify_variant_id: variantId });
 
   if (!variant) {
-    console.log(`No ProductVariant found for shopify_variant_id: ${variantId}`);
     return {};
   }
-
-  console.log(`Found ProductVariant: ${variant._id}, Product ID: ${variant.product_id}`);
 
   return {
     product_id: variant.product_id,

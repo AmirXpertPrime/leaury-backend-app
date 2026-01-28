@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const ProductVariant = require('../models/ProductVariant');
+const { validateNumericId } = require('../utils/validators');
 
 const PRODUCT_FIELDS_PROJECTION = Object.freeze({
     shopify_id: 1,
@@ -18,18 +19,11 @@ const PRODUCT_FIELDS_PROJECTION = Object.freeze({
     options: 1,
 });
 
-exports.getSingleProductApi = async (req, res) => {
+exports.getSingleProductApi = async (req, res, next) => {
     try {
         // Accept both /product/:id and /product?id=...
         const rawId = req.params?.id ?? req.query?.id;
-        const idNum = Number(String(rawId ?? '').trim());
-
-        if (!Number.isFinite(idNum)) {
-            return res.status(400).json({
-                message: 'Invalid product id',
-                status: 400,
-            });
-        }
+        const idNum = validateNumericId(rawId, "Product ID");
 
         const variantCollection = ProductVariant.collection.name;
         const result = await Product.aggregate([
@@ -52,19 +46,18 @@ exports.getSingleProductApi = async (req, res) => {
 
         const product = result?.[0] || null;
         if (!product) {
-            return res.status(404).json({
-                message: 'Product not found',
-                status: 404,
-            });
+            const error = new Error('Product not found');
+            error.status = 404;
+            throw error;
         }
 
-        return res.status(200).json({
-            message: 'Product fetched successfully',
+        res.status(200).json({
+            success: true,
             status: 200,
+            message: 'Product fetched successfully',
             data: product,
         });
     } catch (error) {
-        console.error('Error fetching single product:', error);
-        return res.status(500).json({ message: 'Internal server error', status: 500 });
+        next(error);
     }
 };

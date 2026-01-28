@@ -6,7 +6,7 @@ const OrderLineItem = require("../models/OrderLineItem");
 const { getPagination } = require("../utils/helper");
 
 // Fetch orders from database with pagination
-exports.getShopifyCustomerOrders = async (req, res) => {
+exports.getShopifyCustomerOrders = async (req, res, next) => {
   try {
     const { customerId, shopifyCustomerId } = req.query;
     const { page, limit, skip } = getPagination(req.query, {
@@ -41,7 +41,9 @@ exports.getShopifyCustomerOrders = async (req, res) => {
     }
 
     if (!shopifyId) {
-      return res.status(404).json({ message: "Customer not found" });
+      const error = new Error("Customer not found");
+      error.status = 404;
+      throw error;
     }
 
     // Get total count of orders for this customer
@@ -79,8 +81,10 @@ exports.getShopifyCustomerOrders = async (req, res) => {
       line_items: lineItemsByOrderId[order._id.toString()] || [],
     }));
 
-    return res.status(200).json({
+    res.status(200).json({
+      success: true,
       status: 200,
+      message: "Orders fetched successfully",
       data: ordersWithLineItems,
       pagination: {
         page,
@@ -90,20 +94,12 @@ exports.getShopifyCustomerOrders = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(
-      "❌ Shopify Orders Error:",
-      error.response?.data || error.message,
-    );
-
-    return res.status(error.response?.status || 500).json({
-      status: error.response?.status || 500,
-      message: "Failed to fetch customer orders",
-    });
+    next(error);
   }
 };
 
 // Fetch orders directly from Shopify API
-exports.getShopifyCustomerOrdersFromAPI = async (req, res) => {
+exports.getShopifyCustomerOrdersFromAPI = async (req, res, next) => {
   try {
     const { customerId, shopifyCustomerId } = req.query;
     const { page, limit, skip } = getPagination(req.query, {
@@ -130,7 +126,9 @@ exports.getShopifyCustomerOrdersFromAPI = async (req, res) => {
     }
 
     if (!user || !user.shopify_customer_id) {
-      return res.status(404).json({ message: "Customer not found" });
+      const error = new Error("Customer not found");
+      error.status = 404;
+      throw error;
     }
 
     const response = await axios.get(
@@ -146,8 +144,10 @@ exports.getShopifyCustomerOrdersFromAPI = async (req, res) => {
     const totalOrders = allOrders.length;
     const paginatedOrders = allOrders.slice(skip, skip + limit);
 
-    return res.status(200).json({
+    res.status(200).json({
+      success: true,
       status: 200,
+      message: "Orders fetched successfully from Shopify",
       data: paginatedOrders,
       pagination: {
         page,
@@ -157,14 +157,6 @@ exports.getShopifyCustomerOrdersFromAPI = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(
-      "❌ Shopify Orders Error:",
-      error.response?.data || error.message,
-    );
-
-    return res.status(error.response?.status || 500).json({
-      status: error.response?.status || 500,
-      message: "Failed to fetch customer orders",
-    });
+    next(error);
   }
 };

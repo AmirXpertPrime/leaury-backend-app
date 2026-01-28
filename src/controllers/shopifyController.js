@@ -2,7 +2,7 @@ const axios = require('axios');
 const Product = require('../models/Product');
 const ProductVariant = require('../models/ProductVariant');
 
-exports.syncShopifyProducts = async (req, res) => {
+exports.syncShopifyProducts = async (req, res, next) => {
     try {
         let nextUrl = `${process.env.SHOPIFY_API_URL}/products.json?limit=250&published_status=any`;
         let allProducts = [];
@@ -17,7 +17,6 @@ exports.syncShopifyProducts = async (req, res) => {
             });
 
             const products = response.data.products;
-            console.log(`Fetched ${products.length} products`);
             allProducts.push(...products);
 
             const linkHeader = response.headers.link;
@@ -50,7 +49,6 @@ exports.syncShopifyProducts = async (req, res) => {
                     price: shopifyProduct.variants?.[0]?.price,
                     compare_at_price: shopifyProduct.variants?.[0]?.compare_at_price,
                     sku: shopifyProduct.variants?.[0]?.sku,
-                    // variants: shopifyProduct.variants,
                     inventory_quantity: shopifyProduct.variants?.reduce((sum, v) => sum + v.inventory_quantity, 0),
                     shopify_created_at: shopifyProduct.created_at,
                     shopify_published_at: shopifyProduct.published_at,
@@ -96,9 +94,13 @@ exports.syncShopifyProducts = async (req, res) => {
             }
         }
 
-        res.json({ message: 'Products synced successfully', totalProducts: allProducts.length });
+        res.json({ 
+            success: true,
+            status: 200,
+            message: 'Products synced successfully', 
+            data: { totalProducts: allProducts.length } 
+        });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };

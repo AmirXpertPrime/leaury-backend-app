@@ -1,35 +1,36 @@
 const Customer = require("../models/Customer");
+const { validateNumericId } = require("../utils/validators");
 
-exports.deleteCustomerApi = async (req, res) => {
+exports.deleteCustomerApi = async (req, res, next) => {
   try {
     const { id } = req.query;
 
+    // Validate input
+    const shopifyId = validateNumericId(id, "Customer ID");
+
+    // Find and soft-delete customer
     const customer = await Customer.findOneAndUpdate(
       {
-        shopify_customer_id: id,
+        shopify_customer_id: shopifyId,
         isDeleted: false,
       },
       { isDeleted: true },
       { new: true }
     );
-    console.log('customer============', customer);
 
     if (!customer) {
-      return res.status(404).json({
-        message: "Customer not found ",
-      });
+      const error = new Error("Customer not found");
+      error.status = 404;
+      throw error;
     }
 
     res.status(200).json({
+      success: true,
+      status: 200,
       message: "Customer deleted successfully",
-      customer,
+      data: customer,
     });
   } catch (error) {
-    console.error("Delete Customer API Error:", error);
-    res.status(500).json({
-      message: "Failed to delete customer",
-      error: error.message,
-      status: 500,
-    });
+    next(error);
   }
 };

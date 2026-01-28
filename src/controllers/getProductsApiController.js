@@ -103,7 +103,7 @@ const PRODUCT_FIELDS_PROJECTION = Object.freeze({
     options: 1,
 });
 
-exports.getProductsApi = async (req, res) => {
+exports.getProductsApi = async (req, res, next) => {
     try {
         const { page, limit, skip } = getPagination(req.query, { defaultLimit: 10 });
         const filter = await buildProductFilter({
@@ -267,8 +267,9 @@ exports.getProductsApi = async (req, res) => {
         totalProducts = unpacked.totalCount;
 
         return res.status(200).json({
-            message: 'Products fetched successfully',
+            success: true,
             status: 200,
+            message: 'Products fetched successfully',
             data: productsWithVariants,
             pagination: {
                 total_products: totalProducts,
@@ -279,11 +280,6 @@ exports.getProductsApi = async (req, res) => {
         });
 
     } catch (err) {
-        console.error('Error fetching products:', err);
-        return res.status(500).json({
-            message: 'Failed to fetch products',
-            error: err.message,
-            status: 500,
-        });
+        next(err);
     }
 };
